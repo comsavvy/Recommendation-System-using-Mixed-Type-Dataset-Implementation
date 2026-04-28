@@ -19,4 +19,10 @@
 *.snm
 *.nav
 *.sagetex*
+*.drawio
 *bandwidth-colour.png
+Commands/
+*/code/datasets/
+*/code/catboost_info/
+*/code/ml-1m.zip
+*/Review/
