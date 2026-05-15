@@ -3,7 +3,9 @@
 This repository contains the implementation accompanying my AIMS Rwanda research thesis, which compares three families of recommender systems on the MovieLens-1M dataset under a unified, leakage-free evaluation protocol. The central question is how different modelling families handle datasets that mix numerical, categorical, and binary features alongside user-item interaction data.
 
 **Author:** Olusola Timothy Ogundepo
+
 **Supervisor:** Professor Ernest Fokoué
+
 **Institution:** African Institute for Mathematical Sciences (AIMS), Rwanda
 
 ## Models compared
