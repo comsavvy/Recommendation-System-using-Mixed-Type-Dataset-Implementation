@@ -1,6 +1,6 @@
 # Recommendation Systems with Mixed-Type Data: An Empirical Comparison on MovieLens-1M
 
-This repository contains the implementation accompanying my AIMS Rwanda research thesis, which compares three families of recommender systems on the MovieLens-1M dataset under a unified, leakage-free evaluation protocol. The central question is how different modelling families handle datasets that mix numerical, categorical, and binary features alongside user-item interaction data.
+This repository contains the implementation accompanying my AIMS Rwanda research thesis, which compares three families of recommender systems on the MovieLens-1M dataset under a unified, leakage-free evaluation protocol. Each family is trained under both a pointwise rating-prediction loss and a pairwise ranking loss, so the contribution of the loss function can be separated from that of the architecture. The central question is how different modelling families handle datasets that mix numerical, categorical, and binary features alongside user-item interaction data.
 
 **Author:** Olusola Timothy Ogundepo
 
@@ -10,14 +10,19 @@ This repository contains the implementation accompanying my AIMS Rwanda research
 
 ## Models compared
 
-| Model | Family | Mixed-type handling |
-|---|---|---|
-| Matrix Factorisation (SGD with biases) | Collaborative filtering baseline | None, ratings only |
-| CatBoost (base, 22 features) | Gradient-boosted regression trees | Native categorical splits |
-| CatBoost (extended, 42 features) | Gradient-boosted regression trees | Adds rating-derived statistics |
-| Feature-augmented LightGCN | Graph neural network | Feature projection at layer 0 + graph propagation |
+Seven trained variants are compared, arranged as three pointwise/pairwise pairs plus a feature-poor CatBoost baseline:
 
-All four variants share the same time-based 80/10/10 split, the same evaluation protocol, and the same encoded feature representation, so any performance difference is attributable to the modelling family rather than the experimental setup.
+| Model | Loss | Family | Mixed-type handling |
+|---|---|---|---|
+| Matrix Factorisation (MF) | Squared error (pointwise) | Collaborative filtering baseline | None, ratings only |
+| BPR-MF | BPR (pairwise) | Collaborative filtering | None, ratings only |
+| CatBoost (base, 22 features) | RMSE (pointwise) | Gradient-boosted regression trees | Native categorical splits |
+| CatBoost (extended, 42 features) | RMSE (pointwise) | Gradient-boosted regression trees | Adds rating-derived statistics |
+| CatBoost-YetiRank | YetiRank (pairwise) | Gradient-boosted regression trees | Extended feature set, ranking loss |
+| Feature-augmented LightGCN | MSE (pointwise) | Graph neural network | Feature projection at layer 0 + graph propagation |
+| LightGCN-BPR | BPR (pairwise) | Graph neural network | Feature projection at layer 0 + graph propagation |
+
+All seven variants share the same time-based 80/10/10 split, the same evaluation protocol, and the same encoded feature representation, so any performance difference is attributable to the modelling family and the loss function rather than the experimental setup.
 
 ## Mathematical summary
 
@@ -27,7 +32,9 @@ Given user features $z_u$, item features $x_i$ and the global training mean $\mu
 - CatBoost: $\hat r_{ui} = \mu + \sum_{t=1}^{T} \gamma\, h_t([z_u, x_i])$
 - LightGCN: $\hat r_{ui} = \mu + b_u + b_i + \mathbf{e}_u^{(L)} \cdot \mathbf{e}_i^{(L)}$ with layer-mean aggregation over $L = 2$ propagation rounds and $\mathbf{e}_u^{(0)} = \mathrm{emb}(u) + W_u z_u$.
 
-Evaluation uses RMSE and MAE for rating accuracy, and Precision@10, Recall@10, NDCG@10 for ranking quality.
+The pairwise variants (BPR-MF and LightGCN-BPR) keep the same predictor but are trained on the BPR loss $$\mathcal{L}_{\mathrm{BPR}} = -\sum_{(u,i)\in K} \log \sigma(\hat r_{ui} - \hat r_{uj}) + \lambda\,\Omega$$ with one uniformly sampled negative item $j$ per observed pair. CatBoost-YetiRank uses CatBoost's native YetiRank pairwise objective with rated pairs grouped by user.
+
+Evaluation uses RMSE and MAE for rating accuracy (pointwise models only) and Precision@10, Recall@10, NDCG@10 for ranking quality, averaged over five random samples of 200 test users (seeds 42, 123, 2024, 7, 2026). A non-parametric paired bootstrap with 10,000 resamples is applied to the six headline inter-model contrasts, attaching 95% confidence intervals and one-sided p-values to the reported gaps.
 
 ## Repository contents
 
@@ -74,7 +81,7 @@ A minimal install:
 pip install numpy pandas matplotlib seaborn scikit-learn catboost torch torch-geometric
 ```
 
-Random seeds are fixed at 42 for NumPy, PyTorch, and the ranking sampler so that splits, mini-batches, and sampled evaluation users are reproducible.
+Random seeds are fixed at 42 for NumPy and PyTorch so that splits, mini-batches, model initialisation and negative sampling are reproducible. The ranking evaluation uses a separate list of five user-sampling seeds (42, 123, 2024, 7, 2026).
 
 ## Running the experiments
 
@@ -83,22 +90,36 @@ Open `RS_Code_Implementation.ipynb` and run the cells top to bottom. The noteboo
 1. Setup
 2. Data loading and exploration
 3. Feature engineering and time-based split
-4. Matrix factorisation baseline
-5. CatBoost (base and extended)
-6. Feature-augmented LightGCN
-7. Comparison table and bar plots
+4. Matrix factorisation (pointwise) and BPR-MF (pairwise)
+5. CatBoost (base, extended, and YetiRank pairwise)
+6. Feature-augmented LightGCN (pointwise) and LightGCN-BPR (pairwise)
+7. Comparison tables, bar plots, and paired-bootstrap significance test
 8. Interpretability analysis (CatBoost feature importances, LightGCN embedding PCA)
 
 ## Results on the test split
 
-| Model | RMSE ↓ | MAE ↓ | P@10 ↑ | R@10 ↑ | NDCG@10 ↑ |
-|---|---|---|---|---|---|
-| Matrix factorisation | 0.9155 | **0.7170** | **0.1230** | 0.0345 | 0.1283 |
-| CatBoost (base) | 1.0195 | 0.8214 | 0.0595 | 0.0146 | 0.0536 |
-| CatBoost (extended) | 0.9387 | 0.7378 | 0.0675 | 0.0198 | 0.0733 |
-| Feature-augmented LightGCN | **0.9087** | 0.7175 | 0.1195 | **0.0366** | **0.1350** |
+**Rating accuracy** (pointwise models, full test split):
 
-Bold = best in column. Feature-augmented LightGCN wins on three of the five metrics and is essentially tied with matrix factorisation on the remaining two.
+| Model | RMSE ↓ | MAE ↓ |
+|---|---|---|
+| Matrix factorisation | 0.9155 | **0.7170** |
+| CatBoost (base, 22 features) | 1.0195 | 0.8214 |
+| CatBoost (extended, 42 features) | 0.9387 | 0.7378 |
+| Feature-augmented LightGCN | **0.9087** | 0.7175 |
+
+**Ranking quality** (mean ± standard deviation over five evaluation seeds):
+
+| Model | P@10 ↑ | R@10 ↑ | NDCG@10 ↑ |
+|---|---|---|---|
+| Matrix factorisation (pointwise) | 0.1145 ± 0.0161 | 0.0311 ± 0.0057 | 0.1247 ± 0.0172 |
+| BPR-MF (pairwise) | 0.1810 ± 0.0197 | 0.0605 ± 0.0075 | 0.1968 ± 0.0196 |
+| Feature-augmented LightGCN (pointwise) | 0.1270 ± 0.0174 | 0.0415 ± 0.0060 | 0.1398 ± 0.0207 |
+| LightGCN-BPR (pairwise) | **0.2026 ± 0.0255** | **0.0650 ± 0.0051** | **0.2223 ± 0.0264** |
+| CatBoost extended (pointwise) | 0.0629 ± 0.0049 | 0.0173 ± 0.0025 | 0.0662 ± 0.0057 |
+| CatBoost-YetiRank (pairwise) | 0.0164 ± 0.0043 | 0.0061 ± 0.0034 | 0.0183 ± 0.0060 |
+| CatBoost (base, 22 features) | 0.0533 ± 0.0040 | 0.0141 ± 0.0015 | 0.0493 ± 0.0032 |
+
+Bold = best in column. LightGCN-BPR wins on every ranking metric; on rating accuracy the feature-augmented LightGCN takes RMSE and is tied with matrix factorisation on MAE. The paired-bootstrap analysis (see notebook part 7) confirms every directional claim above at the conventional α = 0.05 threshold, with LightGCN-BPR over BPR-MF on Recall@10 as the single marginal case (p = 0.031).
 
 ## Citing this work
 
