@@ -32,7 +32,11 @@ Given user features $z_u$, item features $x_i$ and the global training mean $\mu
 - CatBoost: $\hat r_{ui} = \mu + \sum_{t=1}^{T} \gamma\, h_t([z_u, x_i])$
 - LightGCN: $\hat r_{ui} = \mu + b_u + b_i + \mathbf{e}_u^{(L)} \cdot \mathbf{e}_i^{(L)}$ with layer-mean aggregation over $L = 2$ propagation rounds and $\mathbf{e}_u^{(0)} = \mathrm{emb}(u) + W_u z_u$.
 
-The pairwise variants (BPR-MF and LightGCN-BPR) keep the same predictor but are trained on the BPR loss $$\mathcal{L}_{\mathrm{BPR}} = -\sum_{(u,i)\in K} \log \sigma(\hat r_{ui} - \hat r_{uj}) + \lambda\,\Omega$$ with one uniformly sampled negative item $j$ per observed pair. CatBoost-YetiRank uses CatBoost's native YetiRank pairwise objective with rated pairs grouped by user.
+The pairwise variants (BPR-MF and LightGCN-BPR) keep the same predictor but are trained on the BPR loss
+
+$$\mathcal{L}_{\mathrm{BPR}} = -\sum_{(u,i)\in K} \log \sigma(\hat r_{ui} - \hat r_{uj}) + \lambda\,\Omega$$
+
+with one uniformly sampled negative item $j$ per observed pair. CatBoost-YetiRank uses CatBoost's native YetiRank pairwise objective with rated pairs grouped by user.
 
 Evaluation uses RMSE and MAE for rating accuracy (pointwise models only) and Precision@10, Recall@10, NDCG@10 for ranking quality, averaged over five random samples of 200 test users (seeds 42, 123, 2024, 7, 2026). A non-parametric paired bootstrap with 10,000 resamples is applied to the six headline inter-model contrasts, attaching 95% confidence intervals and one-sided p-values to the reported gaps.
 
